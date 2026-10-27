@@ -12,9 +12,31 @@
 
     <extensions defaultExtensionNs="com.intellij">
         <notificationGroup id="API HTTP Generator" displayType="BALLOON"/>
+        <codeInsight.lineMarkerProvider language="JAVA"
+                                        implementationClass="dev.sirbuni.devtools.apihttpgenerator.action.RequestLineMarkerProvider"/>
+        <intentionAction>
+            <language>JAVA</language>
+            <className>dev.sirbuni.devtools.apihttpgenerator.action.GenerateRequestIntention</className>
+            <category>API HTTP Generator</category>
+        </intentionAction>
+        <intentionAction>
+            <language>JAVA</language>
+            <className>dev.sirbuni.devtools.apihttpgenerator.action.GenerateControllerRequestsIntention</className>
+            <category>API HTTP Generator</category>
+        </intentionAction>
     </extensions>
 
     <actions>
+        <action id="ApiHttpGenerator.GenerateRequest"
+                class="dev.sirbuni.devtools.apihttpgenerator.action.GenerateRequestAction"
+                text="Generate HTTP Request"
+                description="Write an IntelliJ HTTP Client request for this Spring endpoint (or all of the controller's) into .local/http">
+            <!-- Deliberately unusual so it clashes with nothing; macOS keymaps are listed too or IntelliJ remaps Ctrl. -->
+            <keyboard-shortcut keymap="$default" first-keystroke="control alt shift H"/>
+            <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control alt shift H" replace-all="true"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="last"/>
+        </action>
         <group id="ApiHttpGenerator.CopyAsJson" text="Copy as JSON" popup="true">
             <action id="ApiHttpGenerator.CopyAsJsonFixed"
                     class="dev.sirbuni.devtools.apihttpgenerator.action.CopyAsJsonFixedAction"
@@ -22,12 +44,14 @@
                     description="Copy this class as JSON with fixed fake values that paste anywhere">
                 <!-- Deliberately unusual so it clashes with nothing; rebind in Settings > Keymap. -->
                 <keyboard-shortcut keymap="$default" first-keystroke="control alt shift J"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control alt shift J" replace-all="true"/>
             </action>
             <action id="ApiHttpGenerator.CopyAsJsonPlaceholders"
                     class="dev.sirbuni.devtools.apihttpgenerator.action.CopyAsJsonPlaceholdersAction"
                     text="With $random Placeholders"
                     description="Copy this class as JSON with HTTP Client {{$random}} placeholders, for .http files">
                 <keyboard-shortcut keymap="$default" first-keystroke="control alt shift K"/>
+                <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="control alt shift K" replace-all="true"/>
             </action>
             <!-- Top of the menu, beside java2json's ConvertToJson (which also uses anchor="first"). -->
             <add-to-group group-id="EditorPopupMenu" anchor="first"/>

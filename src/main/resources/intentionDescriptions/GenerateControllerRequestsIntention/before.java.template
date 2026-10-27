@@ -1,0 +1,2 @@
+@PostMapping("/employees")
+public Employee <spot>add</spot>(@RequestBody Employee employee) { ... }

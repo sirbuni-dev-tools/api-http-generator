@@ -13,6 +13,7 @@ import com.intellij.psi.PsiVariable
 import com.intellij.psi.util.PsiTreeUtil
 import dev.sirbuni.devtools.apihttpgenerator.json.JsonNode
 import dev.sirbuni.devtools.apihttpgenerator.psi.ClassWalker
+import dev.sirbuni.devtools.apihttpgenerator.rest.SpringParams
 
 /** What "Copy as JSON" copies, decided from the caret or the Project view selection. */
 sealed interface CopyTarget {
@@ -101,18 +102,7 @@ sealed interface CopyTarget {
         private fun ownerName(variable: PsiVariable): String =
             PsiTreeUtil.getParentOfType(variable, PsiClass::class.java)?.name ?: ""
 
-        /** Request, response, session, principal and SPQR environment arguments never travel as JSON. */
-        private fun isFrameworkParameter(parameter: PsiParameter): Boolean {
-            val type = parameter.type.canonicalText
-            return FRAMEWORK_TYPE_PREFIXES.any { type.startsWith(it) } ||
-                parameter.annotations.any { it.qualifiedName == "$SPQR.GraphQLEnvironment" || it.qualifiedName == "$SPQR.GraphQLRootContext" }
-        }
-
-        private val FRAMEWORK_TYPE_PREFIXES = listOf(
-            "jakarta.servlet.", "javax.servlet.", "java.security.Principal", "org.springframework.ui.",
-            "org.springframework.validation.", "org.springframework.security.", "org.springframework.web.",
-            "org.springframework.http.HttpHeaders", "io.leangen.graphql.execution.",
-        )
+        private fun isFrameworkParameter(parameter: PsiParameter) = SpringParams.isFramework(parameter)
 
         private fun annotationOf(owner: PsiModifierListOwner, simpleName: String) = owner.getAnnotation("$SPRING_BIND.$simpleName")
 

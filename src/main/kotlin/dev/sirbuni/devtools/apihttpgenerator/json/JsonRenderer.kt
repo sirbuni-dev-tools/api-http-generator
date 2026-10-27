@@ -13,6 +13,13 @@ class JsonRenderer(private val mode: RenderMode, private val source: FakeSource 
 
     fun render(node: JsonNode): String = StringBuilder().also { write(node, it, 0) }.toString()
 
+    /** A single value for a URL, form body or header: the placeholder or the raw value, never quoted. */
+    fun renderPlain(node: JsonNode): String {
+        if (node !is ValueNode) return render(node).lines().joinToString("") { it.trim() }
+        val placeholder = node.generator.placeholder
+        return if (mode == RenderMode.PLACEHOLDERS && placeholder != null) "{{$placeholder}}" else node.generator.concrete(source)
+    }
+
     private fun write(node: JsonNode, out: StringBuilder, depth: Int) {
         when (node) {
             is ObjectNode -> writeObject(node.fields.map { it.key to it.value }, out, depth)

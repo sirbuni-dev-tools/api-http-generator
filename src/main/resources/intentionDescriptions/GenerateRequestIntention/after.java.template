@@ -1,0 +1,5 @@
+### POST add
+POST {{HOST}}/employees
+Content-Type: application/json
+
+{ "firstName": "{{$random.name.firstName}}" }

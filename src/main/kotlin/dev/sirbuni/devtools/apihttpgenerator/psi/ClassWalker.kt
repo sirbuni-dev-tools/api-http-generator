@@ -39,7 +39,11 @@ import dev.sirbuni.devtools.apihttpgenerator.json.ValueNode
  * `@Transient` and `@JsonIgnore` members, renames by `@JsonProperty`, and reads validation
  * constraints. Nested classes stop at [maxDepth]; a class already on the path becomes `{}`.
  */
-class ClassWalker(private val maxDepth: Int = 3) {
+class ClassWalker(
+    private val maxDepth: Int = 3,
+    /** Leave out `@GeneratedValue` fields, which a create request must not send (Hibernate then expects the row to exist). */
+    private val skipGenerated: Boolean = false,
+) {
 
     private data class Member(val name: String, val owner: String, val annotated: PsiModifierListOwner?)
 
@@ -150,7 +154,8 @@ class ClassWalker(private val maxDepth: Int = 3) {
     }
 
     private fun isSkipped(owner: PsiModifierListOwner) =
-        annotation(owner, "Transient") != null || annotation(owner, "JsonIgnore")?.let { boolean(it, "value") != false } == true
+        annotation(owner, "Transient") != null || annotation(owner, "JsonIgnore")?.let { boolean(it, "value") != false } == true ||
+            (skipGenerated && annotation(owner, "GeneratedValue") != null)
 
     private fun jsonName(owner: PsiModifierListOwner): String? =
         annotation(owner, "JsonProperty")?.let { string(it, "value") }?.takeIf { it.isNotEmpty() }
@@ -254,6 +259,7 @@ class ClassWalker(private val maxDepth: Int = 3) {
                     "JsonIgnore" to JACKSON,
                     "JsonIgnoreProperties" to JACKSON,
                     "Transient" to listOf("jakarta.persistence", "javax.persistence", "org.springframework.data.annotation"),
+                    "GeneratedValue" to listOf("jakarta.persistence", "javax.persistence"),
                 )
     }
 }
