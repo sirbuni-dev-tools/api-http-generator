@@ -13,6 +13,9 @@ kotlin {
 }
 
 dependencies {
+    // Fixed fake values; the same provider names as the HTTP Client's $random (which uses Java Faker).
+    implementation("net.datafaker:datafaker:2.7.0")
+
     testImplementation("junit:junit:4.13.2")
 
     intellijPlatform {
@@ -20,6 +23,7 @@ dependencies {
         // Java PSI: reads controllers, SPQR resolvers and request/response classes.
         bundledPlugin("com.intellij.java")
         testFramework(TestFrameworkType.Platform)
+        testFramework(TestFrameworkType.Plugin.Java)
     }
 }
 
