@@ -1,0 +1,12 @@
+<idea-plugin>
+    <id>dev.sirbuni.devtools.apihttpgenerator</id>
+    <name>API HTTP Generator</name>
+    <vendor url="https://github.com/sirbuni-dev-tools">Sirbuni Dev</vendor>
+    <description><![CDATA[
+        <p>Generates IntelliJ HTTP Client requests for Spring REST controllers and SPQR GraphQL resolvers,
+        and copies Java classes as JSON filled with realistic fake values.</p>
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>com.intellij.modules.java</depends>
+</idea-plugin>
