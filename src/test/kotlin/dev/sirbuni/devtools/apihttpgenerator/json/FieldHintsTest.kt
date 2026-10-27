@@ -54,6 +54,22 @@ class FieldHintsTest {
     }
 
     @Test
+    fun `paging starts at the first page and sorting is left unset`() {
+        assertEquals(IntegerRange(0, 0), resolve("first", ValueKind.INTEGER))
+        assertEquals(IntegerRange(0, 0), resolve("page", ValueKind.INTEGER))
+        assertEquals(IntegerRange(10, 10), resolve("pageSize", ValueKind.INTEGER))
+        assertEquals(NullValue, resolve("sortBy"))
+        assertEquals(OneOf(listOf("ASC", "DESC")), resolve("sortDirection"))
+    }
+
+    @Test
+    fun `a password and its confirmation get the same value`() {
+        assertEquals(FieldHints.PASSWORD, resolve("password", constraints = Constraints(minSize = 8, maxSize = 20)))
+        assertEquals(FieldHints.PASSWORD, resolve("confirmPassword"))
+        assertEquals(FieldHints.PASSWORD, resolve("newPassword"))
+    }
+
+    @Test
     fun `enums pick from their constants`() {
         val generator = FieldHints.resolve(FieldContext("status", ValueKind.ENUM, enumConstants = listOf("OPEN", "CLOSED")))
         assertEquals(OneOf(listOf("OPEN", "CLOSED")), generator)

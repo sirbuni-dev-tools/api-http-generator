@@ -62,7 +62,25 @@ object HttpFileText {
         return "http://localhost:$port" + (contextPath?.let { "/$it" } ?: "")
     }
 
-    fun envFile(host: String): String = "{\n  \"local\": {\n    \"HOST\": \"$host\"\n  }\n}\n"
+    /** SPQR's endpoint from `graphql.spqr.http.endpoint`, `/graphql` when unset. */
+    fun graphqlPath(properties: String?, yaml: String?): String =
+        (property(properties, "graphql.spqr.http.endpoint") ?: yamlValue(yaml, listOf("graphql", "spqr", "http", "endpoint")))
+            ?.takeIf { it.isNotBlank() }?.let { "/" + it.trim('/') } ?: "/graphql"
+
+    /**
+     * Adds missing keys to the `local` environment of an env file (created when absent), keeping
+     * every existing value. Returns null when nothing changes.
+     */
+    fun withEnvKeys(existing: String?, keys: Map<String, String>): String? {
+        val gson = com.google.gson.GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create()
+        val root = existing?.takeIf { it.isNotBlank() }
+            ?.let { com.google.gson.JsonParser.parseString(it).asJsonObject } ?: com.google.gson.JsonObject()
+        val local = root.getAsJsonObject("local") ?: com.google.gson.JsonObject().also { root.add("local", it) }
+        val missing = keys.filterKeys { !local.has(it) }
+        if (missing.isEmpty() && existing != null) return null
+        missing.forEach { (k, v) -> local.addProperty(k, v) }
+        return gson.toJson(root) + "\n"
+    }
 
     private fun property(text: String?, key: String): String? =
         text?.lines()?.map { it.trim() }?.lastOrNull { it.startsWith("$key=") || it.startsWith("$key:") || it.startsWith("$key ") }

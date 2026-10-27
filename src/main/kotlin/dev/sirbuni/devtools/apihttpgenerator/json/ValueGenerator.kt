@@ -30,9 +30,9 @@ data class FakerValue(val provider: String, val method: String, override val isS
 data class IntegerRange(val min: Long, val max: Long) : ValueGenerator {
     override val isString = false
 
-    // $random.integer works on int and excludes its upper bound.
+    // $random.integer works on int and excludes its upper bound; a single possible value is written as is.
     override val placeholder: String?
-        get() = if (min >= Int.MIN_VALUE && max < Int.MAX_VALUE) "\$random.integer($min, ${max + 1})" else null
+        get() = if (min != max && min >= Int.MIN_VALUE && max < Int.MAX_VALUE) "\$random.integer($min, ${max + 1})" else null
 
     override fun concrete(source: FakeSource) = source.long(min, max).toString()
 }
@@ -104,6 +104,13 @@ data class PatternValue(val regex: String) : ValueGenerator {
     override val isString = true
     override val placeholder: String? = null
     override fun concrete(source: FakeSource) = source.regexify(regex)
+}
+
+/** An explicit `null`, for values no fake can get right, such as the property to sort by. */
+data object NullValue : ValueGenerator {
+    override val isString = false
+    override val placeholder: String? = null
+    override fun concrete(source: FakeSource) = "null"
 }
 
 /** `byte[]`, which Jackson writes as Base64. */

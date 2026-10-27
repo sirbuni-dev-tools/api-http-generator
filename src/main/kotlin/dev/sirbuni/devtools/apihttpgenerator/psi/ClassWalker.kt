@@ -21,6 +21,7 @@ import com.intellij.psi.util.TypeConversionUtil
 import dev.sirbuni.devtools.apihttpgenerator.json.ArrayNode
 import dev.sirbuni.devtools.apihttpgenerator.json.Constraints
 import dev.sirbuni.devtools.apihttpgenerator.json.CutNode
+import dev.sirbuni.devtools.apihttpgenerator.json.EmptyArrayNode
 import dev.sirbuni.devtools.apihttpgenerator.json.FieldContext
 import dev.sirbuni.devtools.apihttpgenerator.json.FieldHints
 import dev.sirbuni.devtools.apihttpgenerator.json.JsonField
@@ -43,9 +44,12 @@ class ClassWalker(
     private val maxDepth: Int = 3,
     /** Leave out `@GeneratedValue` fields, which a create request must not send (Hibernate then expects the row to exist). */
     private val skipGenerated: Boolean = false,
+    /** Also follow public getters without a matching field (such as a computed `getCode()`), as SPQR's output types do. */
+    private val includeGetters: Boolean = false,
 ) {
 
-    private data class Member(val name: String, val owner: String, val annotated: PsiModifierListOwner?)
+    /** [inObject] is true for a field of a payload class, false for a top-level parameter or argument. */
+    private data class Member(val name: String, val owner: String, val annotated: PsiModifierListOwner?, val inObject: Boolean = false)
 
     fun walk(psiClass: PsiClass): JsonNode =
         walk(JavaPsiFacade.getElementFactory(psiClass.project).createType(psiClass))
@@ -62,7 +66,7 @@ class ClassWalker(
     /** `List<T>`, `Set<T>`, `Map<K, V>` and the like, which render as JSON arrays or objects although they are interfaces. */
     fun isCollectionOrMap(type: PsiType): Boolean {
         val cls = (type as? PsiClassType)?.resolve() ?: return false
-        return InheritanceUtil.isInheritor(cls, "java.lang.Iterable") || InheritanceUtil.isInheritor(cls, "java.util.Map")
+        return InheritanceUtil.isInheritor(cls, "java.util.Collection") || InheritanceUtil.isInheritor(cls, "java.util.Map")
     }
 
     /** Whether a type renders as a JSON object of its own fields (a DTO or entity), not as a single value or list. */
@@ -102,8 +106,10 @@ class ClassWalker(
             val value = PsiUtil.substituteTypeParameter(type, "java.util.Map", 1, false)
             return MapNode(value?.let { node(it, member, path, depth) } ?: NullNode)
         }
-        if (InheritanceUtil.isInheritor(cls, "java.lang.Iterable")) {
-            val element = PsiUtil.substituteTypeParameter(type, "java.lang.Iterable", 0, false)
+        // Collections only: Spring Data's Page is Iterable but Jackson and SPQR write it as an object with content.
+        if (InheritanceUtil.isInheritor(cls, "java.util.Collection")) {
+            if (isCriteriaList(member.name)) return EmptyArrayNode
+            val element = PsiUtil.substituteTypeParameter(type, "java.util.Collection", 0, false)
             return ArrayNode(element?.let { node(it, member, path, depth) } ?: NullNode)
         }
         if (name.startsWith("java.") || name.startsWith("javax.") || name.startsWith("jakarta.")) return NullNode
@@ -120,7 +126,7 @@ class ClassWalker(
                 if (isSkipped(component)) continue
                 val key = jsonName(component) ?: component.name
                 if (key in ignored) continue
-                fields += JsonField(key, node(substitutor.substitute(component.type), Member(component.name, cls.name ?: "", component), path, depth))
+                fields += JsonField(key, node(substitutor.substitute(component.type), Member(component.name, cls.name ?: "", component, inObject = true), path, depth))
             }
             return ObjectNode(fields)
         }
@@ -132,13 +138,62 @@ class ClassWalker(
                 if (field is PsiEnumConstant || field.hasModifierProperty(PsiModifier.STATIC) ||
                     field.hasModifierProperty(PsiModifier.TRANSIENT) || isSkipped(field)
                 ) continue
+                if (includeGetters && !isExposed(field, cls)) continue
                 val key = jsonName(field) ?: field.name
                 if (key in ignored || fields.any { it.key == key }) continue
                 val type = classSubstitutor.substitute(field.type) ?: field.type
-                fields += JsonField(key, node(type, Member(field.name, cls.name ?: "", field), path, depth))
+                fields += JsonField(key, node(type, Member(field.name, cls.name ?: "", field, inObject = true), path, depth))
+            }
+        }
+        if (includeGetters) {
+            // Interfaces too: Spring Data's Page<T> declares getContent() on Slice, a parent interface.
+            for (declaring in listOf(cls) + InheritanceUtil.getSuperClasses(cls).filter { it.qualifiedName != "java.lang.Object" }) {
+                val classSubstitutor = if (declaring == cls) substitutor
+                else TypeConversionUtil.getSuperClassSubstitutor(declaring, cls, substitutor)
+                for (method in declaring.methods) {
+                    val key = propertyName(method) ?: continue
+                    if (fields.any { it.key == key } || isSkipped(method)) continue
+                    val type = classSubstitutor.substitute(method.returnType) ?: continue
+                    fields += JsonField(key, node(type, Member(key, cls.name ?: "", method, inObject = true), path, depth))
+                }
             }
         }
         return ObjectNode(fields)
+    }
+
+    /**
+     * Whether an output type shows this field: it is public, Lombok generates its getter (`@Getter`, `@Data`
+     * or `@Value` on the field or class), or the class has the getter itself. SPQR exposes nothing else,
+     * and asking for a field it does not expose fails the whole query.
+     */
+    private fun isExposed(field: com.intellij.psi.PsiField, cls: PsiClass): Boolean {
+        if (field.hasModifierProperty(PsiModifier.PUBLIC)) return true
+        val owner = field.containingClass
+        if (LOMBOK_GETTERS.any { field.hasAnnotation(it) || owner?.hasAnnotation(it) == true }) return true
+        val suffix = field.name.replaceFirstChar { it.uppercase() }
+        return cls.findMethodsByName("get$suffix", true).isNotEmpty() || cls.findMethodsByName("is$suffix", true).isNotEmpty()
+    }
+
+    /** Search filters and sort lists: a made-up entry names a field the server does not allow, so they stay empty. */
+    private fun isCriteriaList(name: String): Boolean {
+        val n = name.lowercase()
+        return n.contains("filter") || n.contains("search") || n.contains("criteria") || n in setOf("sort", "sorts", "sortfields", "orderby")
+    }
+
+    /** `getCode()` -> `code`, `isActive()` on a boolean -> `active`; null for anything that is not a public getter. */
+    private fun propertyName(method: com.intellij.psi.PsiMethod): String? {
+        if (!method.hasModifierProperty(PsiModifier.PUBLIC) || method.hasModifierProperty(PsiModifier.STATIC) ||
+            method.parameterList.parametersCount > 0 || method.isConstructor
+        ) return null
+        val returnType = method.returnType ?: return null
+        if (returnType == PsiTypes.voidType()) return null
+        val name = method.name
+        val raw = when {
+            name.startsWith("get") && name.length > 3 && name != "getClass" -> name.substring(3)
+            name.startsWith("is") && name.length > 2 && (returnType == PsiTypes.booleanType() || returnType.canonicalText == "java.lang.Boolean") -> name.substring(2)
+            else -> return null
+        }
+        return raw.replaceFirstChar { it.lowercase() }
     }
 
     /** The class and its superclasses, top-most first, without `java.lang.Object`. */
@@ -149,12 +204,15 @@ class ClassWalker(
             .reversed()
 
     private fun leaf(kind: ValueKind, member: Member, enumConstants: List<String> = emptyList()): JsonNode {
+        // A request's own id picks the record to update or is generated by the server: never a made-up value.
+        if (skipGenerated && member.inObject && member.name.lowercase() in OWN_IDS) return NullNode
         val context = FieldContext(member.name, kind, member.owner, enumConstants, constraints(member.annotated))
         return ValueNode(FieldHints.resolve(context))
     }
 
     private fun isSkipped(owner: PsiModifierListOwner) =
         annotation(owner, "Transient") != null || annotation(owner, "JsonIgnore")?.let { boolean(it, "value") != false } == true ||
+            annotation(owner, "GraphQLIgnore") != null ||
             (skipGenerated && annotation(owner, "GeneratedValue") != null)
 
     private fun jsonName(owner: PsiModifierListOwner): String? =
@@ -247,6 +305,9 @@ class ClassWalker(
             "java.sql.Timestamp" to ValueKind.INSTANT,
         )
 
+        private val OWN_IDS = setOf("id", "uid", "uuid")
+        private val LOMBOK_GETTERS = listOf("lombok.Getter", "lombok.Data", "lombok.Value")
+
         private val VALIDATION = listOf("jakarta.validation.constraints", "javax.validation.constraints")
         private val JACKSON = listOf("com.fasterxml.jackson.annotation")
 
@@ -260,6 +321,7 @@ class ClassWalker(
                     "JsonIgnoreProperties" to JACKSON,
                     "Transient" to listOf("jakarta.persistence", "javax.persistence", "org.springframework.data.annotation"),
                     "GeneratedValue" to listOf("jakarta.persistence", "javax.persistence"),
+                    "GraphQLIgnore" to listOf("io.leangen.graphql.annotations"),
                 )
     }
 }

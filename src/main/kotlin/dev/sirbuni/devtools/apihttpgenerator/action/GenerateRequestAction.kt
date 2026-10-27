@@ -15,10 +15,11 @@ import com.intellij.psi.PsiIdentifier
 import com.intellij.psi.PsiJavaFile
 import com.intellij.psi.PsiMethod
 import com.intellij.psi.util.PsiTreeUtil
+import dev.sirbuni.devtools.apihttpgenerator.graphql.SpqrOperations
 import dev.sirbuni.devtools.apihttpgenerator.rest.RequestFileService
 import dev.sirbuni.devtools.apihttpgenerator.rest.SpringEndpoints
 
-/** Where request generation starts: one handler method, or a whole controller. */
+/** Where request generation starts: one handler or resolver method, or a whole controller or resolver class. */
 sealed interface GenerateTarget {
     data class Method(val method: PsiMethod) : GenerateTarget
     data class Controller(val cls: PsiClass) : GenerateTarget
@@ -32,15 +33,20 @@ sealed interface GenerateTarget {
         /** A handler method around the caret, else the controller around it (or the controller of the file). */
         fun at(element: PsiElement?, file: PsiJavaFile?): GenerateTarget? {
             if (element != null) {
-                if (element is PsiMethod && SpringEndpoints.endpoint(element) != null) return Method(element)
-                if (element is PsiClass && SpringEndpoints.isController(element)) return Controller(element)
+                if (element is PsiMethod && isGenerated(element)) return Method(element)
+                if (element is PsiClass && isGenerated(element)) return Controller(element)
                 PsiTreeUtil.getParentOfType(element, PsiMethod::class.java, false)
-                    ?.takeIf { SpringEndpoints.endpoint(it) != null }?.let { return Method(it) }
+                    ?.takeIf { isGenerated(it) }?.let { return Method(it) }
                 PsiTreeUtil.getParentOfType(element, PsiClass::class.java, false)
-                    ?.takeIf { SpringEndpoints.isController(it) }?.let { return Controller(it) }
+                    ?.takeIf { isGenerated(it) }?.let { return Controller(it) }
             }
-            return file?.classes?.firstOrNull { SpringEndpoints.isController(it) }?.let { Controller(it) }
+            return file?.classes?.firstOrNull { isGenerated(it) }?.let { Controller(it) }
         }
+
+        fun isGenerated(method: PsiMethod) = SpringEndpoints.endpoint(method) != null || SpqrOperations.operation(method) != null
+
+        fun isGenerated(cls: PsiClass) =
+            SpringEndpoints.isController(cls) || SpqrOperations.isResolverClass(cls)
     }
 }
 
@@ -85,7 +91,7 @@ class GenerateRequestIntention : PsiElementBaseIntentionAction() {
     private fun handlerAt(element: PsiElement): PsiMethod? {
         val method = PsiTreeUtil.getParentOfType(element, PsiMethod::class.java, false) ?: return null
         if (PsiTreeUtil.isAncestor(method.body ?: return null, element, false) && element !is PsiCodeBlock) return null
-        return method.takeIf { SpringEndpoints.endpoint(it) != null }
+        return method.takeIf { GenerateTarget.isGenerated(it) }
     }
 }
 
@@ -103,6 +109,6 @@ class GenerateControllerRequestsIntention : PsiElementBaseIntentionAction() {
 
     private fun controllerAt(element: PsiElement): PsiClass? {
         val cls = (element as? PsiIdentifier)?.parent as? PsiClass ?: return null
-        return cls.takeIf { SpringEndpoints.isController(it) && SpringEndpoints.endpoints(it).isNotEmpty() }
+        return cls.takeIf { SpringEndpoints.endpoints(it).isNotEmpty() || SpqrOperations.operations(it).isNotEmpty() }
     }
 }

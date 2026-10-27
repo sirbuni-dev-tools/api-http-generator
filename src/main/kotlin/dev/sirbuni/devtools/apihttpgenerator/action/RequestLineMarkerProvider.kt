@@ -12,6 +12,7 @@ import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiIdentifier
 import com.intellij.psi.PsiMethod
 import com.intellij.ui.awt.RelativePoint
+import dev.sirbuni.devtools.apihttpgenerator.graphql.SpqrOperations
 import dev.sirbuni.devtools.apihttpgenerator.json.JsonRenderer
 import dev.sirbuni.devtools.apihttpgenerator.json.RenderMode
 import dev.sirbuni.devtools.apihttpgenerator.psi.ClassWalker
@@ -19,12 +20,12 @@ import dev.sirbuni.devtools.apihttpgenerator.rest.RequestFileService
 import dev.sirbuni.devtools.apihttpgenerator.rest.SpringEndpoints
 import java.awt.datatransfer.StringSelection
 
-/** A gutter icon on Spring handler methods; a click offers a small menu rather than writing at once. */
+/** A gutter icon on Spring handlers and SPQR resolvers; a click offers a small menu rather than writing at once. */
 class RequestLineMarkerProvider : LineMarkerProvider {
 
     override fun getLineMarkerInfo(element: PsiElement): LineMarkerInfo<*>? {
         val method = (element as? PsiIdentifier)?.parent as? PsiMethod ?: return null
-        if (method.nameIdentifier != element || !SpringEndpoints.looksLikeHandler(method)) return null
+        if (method.nameIdentifier != element || !(SpringEndpoints.looksLikeHandler(method) || SpqrOperations.looksLikeResolver(method))) return null
         return LineMarkerInfo(
             element, element.textRange, ICON,
             { "Generate HTTP request" },
@@ -63,6 +64,6 @@ class RequestLineMarkerProvider : LineMarkerProvider {
         private val ICON = IconLoader.getIcon("/icons/httpRequest.svg", RequestLineMarkerProvider::class.java)
         private const val GENERATE_ONE = "Generate request for this endpoint"
         private const val GENERATE_ALL = "Generate requests for the whole controller"
-        private const val COPY_JSON = "Copy request body as JSON (\$random placeholders)"
+        private const val COPY_JSON = "Copy request body or arguments as JSON (\$random placeholders)"
     }
 }

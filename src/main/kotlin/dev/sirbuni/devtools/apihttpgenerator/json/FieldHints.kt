@@ -37,6 +37,9 @@ object FieldHints {
 
     private class Hint(val names: Set<String>, val kinds: Set<ValueKind>, val generator: (FieldContext) -> ValueGenerator)
 
+    /** Upper and lower case, digits and a symbol, 15 characters: passes the usual password policies. */
+    val PASSWORD = OneOf(listOf("Str0ng!Passw0rd"))
+
     private val text = setOf(ValueKind.STRING)
     private val whole = setOf(ValueKind.INTEGER, ValueKind.LONG, ValueKind.BIG_INTEGER)
     private val numbers = setOf(ValueKind.INTEGER, ValueKind.LONG, ValueKind.BIG_INTEGER, ValueKind.DECIMAL)
@@ -74,7 +77,9 @@ object FieldHints {
         hint(text, "fullname", "displayname", "contactname", "contactperson", generator = faker("name", "fullName")),
         hint(text, "name") { ctx -> nameFor(ctx.owner) },
         hint(text, "username", "login", "loginname", "userid", generator = faker("name", "username")),
-        hint(text, "password", "pwd", "pass", "newpassword", "oldpassword", "confirmpassword", generator = faker("internet", "password")),
+        // One shared value: a password and its confirmation must match, and random ones never do.
+        hint(text, "password", "pwd", "pass", "newpassword", "oldpassword", "currentpassword", "confirmpassword", "confirmnewpassword",
+            "passwordconfirmation", "repeatpassword", "retypepassword") { PASSWORD },
         hint(text, "phone", "phonenumber", "mobile", "mobilenumber", "msisdn", "telephone", "tel", "cellphone", "cell", generator = faker("phoneNumber", "cellPhone")),
         hint(text, "url", "website", "homepage", "link", "weburl", generator = faker("internet", "url")),
         hint(text, "domain", "domainname", generator = faker("internet", "domainName")),
@@ -119,11 +124,16 @@ object FieldHints {
         hint(whole, "age") { IntegerRange(18, 65) },
         hint(whole, "year", "financialyear", "fiscalyear") { IntegerRange(2020, 2030) },
         hint(whole, "month") { IntegerRange(1, 12) },
+        // Paging and sorting: the first page, a small page, and no sort property (a made-up one is rejected).
+        hint(whole, "first", "offset", "page", "pagenumber", "pageno", "pageindex") { IntegerRange(0, 0) },
+        hint(whole, "pagesize", "limit") { IntegerRange(10, 10) },
+        hint(text, "sortby", "orderby", "sortfield", "sortproperty") { NullValue },
+        hint(text, "sortdirection", "direction", "sortorder", "order") { OneOf(listOf("ASC", "DESC")) },
         hint(whole, "quantity", "qty", "count", "number", "total", "stock", "capacity", "size") { IntegerRange(1, 100) },
         hint(numbers, "percent", "percentage", "rate", "ratio", "score") { ctx ->
             if (ctx.kind == ValueKind.DECIMAL) DecimalRange(0.0, 100.0) else IntegerRange(0, 100)
         },
-        hint(whole, "id", "version", "page") { IntegerRange(1, 1000) },
+        hint(whole, "id", "version") { IntegerRange(1, 1000) },
     )
 
     private val hintsByName: Map<String, List<Hint>> =
@@ -160,7 +170,7 @@ object FieldHints {
         return when {
             ctx.kind == ValueKind.STRING && c.pattern != null -> PatternValue(c.pattern)
             ctx.kind == ValueKind.STRING && c.email -> FakerValue("internet", "emailAddress")
-            ctx.kind == ValueKind.STRING && (c.minSize != null || c.maxSize != null) -> sizedText(ctx, c)
+            ctx.kind == ValueKind.STRING && (c.minSize != null || c.maxSize != null) && !ctx.name.lowercase().contains("password") -> sizedText(ctx, c)
             ctx.kind.isWholeNumber && (c.min != null || c.max != null) -> {
                 val min = c.min?.toLong() ?: 0L
                 IntegerRange(min, c.max?.toLong() ?: maxOf(min + 1000, 1000))

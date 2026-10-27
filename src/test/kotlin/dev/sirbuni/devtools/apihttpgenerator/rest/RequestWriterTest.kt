@@ -93,7 +93,7 @@ class RequestWriterTest : LightJavaCodeInsightFixtureTestCase() {
 
     fun `test GET puts params in the query, including unannotated simple ones`() {
         val text = write("search").text
-        assertTrue(text, text.contains("GET {{HOST}}/api/search\n    ?firstName={{${'$'}random.name.firstName}}\n    &page={{${'$'}random.integer(1, 1001)}}\n"))
+        assertTrue(text, text.contains("GET {{HOST}}/api/search\n    ?firstName={{${'$'}random.name.firstName}}\n    &page=0\n"))
     }
 
     fun `test request body is JSON and servlet arguments are ignored`() {

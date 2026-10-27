@@ -32,6 +32,7 @@ class JsonRenderer(private val mode: RenderMode, private val source: FakeSource 
             is ValueNode -> out.append(value(node.generator))
             CutNode -> out.append("{}")
             NullNode -> out.append("null")
+            EmptyArrayNode -> out.append("[]")
         }
     }
 

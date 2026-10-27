@@ -21,3 +21,6 @@ data class ValueNode(val generator: ValueGenerator) : JsonNode
 data object CutNode : JsonNode
 
 data object NullNode : JsonNode
+
+/** A list left empty on purpose, such as search filters, where any made-up entry would be rejected. */
+data object EmptyArrayNode : JsonNode
