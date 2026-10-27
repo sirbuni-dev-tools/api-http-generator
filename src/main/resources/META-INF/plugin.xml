@@ -3,8 +3,51 @@
     <name>API HTTP Generator</name>
     <vendor url="https://github.com/sirbuni-dev-tools">Sirbuni Dev</vendor>
     <description><![CDATA[
-        <p>Generates IntelliJ HTTP Client requests for Spring REST controllers and SPQR GraphQL resolvers,
-        and copies Java classes as JSON filled with realistic fake values.</p>
+        <p>Writes IntelliJ HTTP Client requests for Spring REST controllers and SPQR GraphQL resolvers,
+        and copies Java classes as JSON filled with realistic fake values, so endpoints can be tested
+        without leaving the IDE.</p>
+
+        <h3>Generate requests</h3>
+        <ul>
+          <li>Gutter icon on a handler or resolver, Alt+Enter on a method or class name, the editor menu,
+              or <b>Ctrl+Alt+Shift+H</b>.</li>
+          <li>Requests go to <code>.local/http/&lt;Class&gt;.http</code>; running again only appends what is missing.</li>
+          <li>Every request has a <code>###</code> title and a unique <code># @name</code> for the Services tool window.</li>
+          <li>REST: <code>{{HOST}}</code> URLs, path variables and ids as file variables you set once,
+              query or form parameters, headers and a JSON body.</li>
+          <li>SPQR GraphQL: a login request that stores <code>access_token</code>, operation variables typed the way
+              SPQR names them (<code>SearchRequestInput</code>), and a three-level selection set.</li>
+          <li><code>http-client.env.json</code> and <code>http-client.private.env.json</code> are created with
+              <code>HOST</code> from <code>server.port</code>, plus the login keys for GraphQL.</li>
+        </ul>
+
+        <h3>Copy as JSON</h3>
+        <ul>
+          <li><b>With Fake Values</b> (Ctrl+Alt+Shift+J): fixed values that paste anywhere.</li>
+          <li><b>With $random Placeholders</b> (Ctrl+Alt+Shift+K): <code>{{$random...}}</code> for .http files.</li>
+          <li>Works on a class, a field, a parameter, or a method's body or parameters.</li>
+        </ul>
+
+        <h3>Fake values</h3>
+        <p>Chosen from validation constraints first (<code>@Email</code>, <code>@Size</code>, <code>@Min</code>/<code>@Max</code>,
+        <code>@Pattern</code>, <code>@Past</code>/<code>@Future</code>), then about 60 field-name hints, then the Java type:</p>
+        <table>
+          <tr><td>email</td><td><code>{{$random.internet.emailAddress}}</code></td></tr>
+          <tr><td>firstName / lastName / fullName</td><td><code>{{$random.name.firstName}}</code> and similar</td></tr>
+          <tr><td>phone, mobile</td><td><code>{{$random.phoneNumber.cellPhone}}</code></td></tr>
+          <tr><td>city, street, address, zip, country, region</td><td><code>{{$random.address.*}}</code></td></tr>
+          <tr><td>company, department, industry, title</td><td><code>{{$random.company.name}}</code>, <code>commerce.department</code>, ...</td></tr>
+          <tr><td>description / message / tag</td><td><code>{{$random.lorem.sentence}}</code> / <code>paragraph</code> / <code>word</code></td></tr>
+          <tr><td>uid, uuid</td><td><code>{{$uuid}}</code></td></tr>
+          <tr><td>salary, amount, price</td><td><code>{{$random.integer(1000, 5000001)}}</code></td></tr>
+          <tr><td>password and its confirmation</td><td>one fixed strong value, so they match</td></tr>
+          <tr><td>page / pageSize / sortBy</td><td><code>0</code> / <code>10</code> / <code>null</code></td></tr>
+          <tr><td>dates, booleans, enums</td><td>fixed values (the HTTP Client has no generator for them)</td></tr>
+        </table>
+        <p>Own ids inside payloads are <code>null</code>, <code>@GeneratedValue</code> fields are left out and search
+        filters are empty, so generated requests are accepted. The full table is in the README.</p>
+
+        <p>Shortcuts are deliberately unusual; rebind them in Settings &gt; Keymap.</p>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
