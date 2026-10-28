@@ -1,0 +1,63 @@
+# Runs when dev is merged into main. The next version comes from the conventional commits
+# since the last tag (fix -> patch, feat -> minor, breaking -> major); when nothing bumps it,
+# for example only docs or chore commits, the run stops without a release.
+name: release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+      - name: Next version
+        id: version
+        run: |
+          go install github.com/caarlos0/svu/v3@v3.4.1
+          current="$(svu current)"
+          next="$(svu next)"
+          echo "current=$current next=$next"
+          if [ "$current" = "$next" ]; then
+            echo "Nothing to release: no fix, feat or breaking commits since $current."
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+            echo "tag=$next" >> "$GITHUB_OUTPUT"
+            echo "version=${next#v}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-java@v5
+        if: steps.version.outputs.release == 'true'
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: gradle/actions/setup-gradle@v4
+        if: steps.version.outputs.release == 'true'
+      - name: Test and build
+        if: steps.version.outputs.release == 'true'
+        run: ./gradlew test buildPlugin -PpluginVersion=${{ steps.version.outputs.version }}
+      - name: Tag and release
+        if: steps.version.outputs.release == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "$TAG" -m "$TAG"
+          git push origin "$TAG"
+          gh release create "$TAG" "build/distributions/api-http-generator-$VERSION.zip" --title "$TAG" --generate-notes
