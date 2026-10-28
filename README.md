@@ -12,7 +12,7 @@ Generated requests go to `.local/http/<Class>.http` in the module, which keeps t
 
 ## 1. Install
 
-1. Get `api-http-generator-<version>.zip` (from a release, or build it, section 8).
+1. Download `api-http-generator-<version>.zip` from the [Releases page](https://github.com/sirbuni-dev-tools/api-http-generator/releases) (do not unzip it), or build it yourself (section 8).
 2. In IntelliJ IDEA: **Settings > Plugins > gear icon > Install Plugin from Disk**, pick the zip.
 3. Restart the IDE when asked.
 
@@ -277,6 +277,12 @@ Needs JDK 21.
 
 The zip lands in `build/distributions/`. Tests run headless in IntelliJ's test framework.
 
+**Branches and releases**: work happens on feature branches merged into `dev`, where CI runs the tests and builds the plugin. Merging `dev` into `main` releases: the version comes from the [Conventional Commits](https://www.conventionalcommits.org) since the last release (`fix:` a patch, `feat:` a minor version, `feat!:` a major one; `docs:` or `chore:` alone release nothing), and the plugin zip is attached to a GitHub Release.
+
 ## 9. Compatibility
 
 IntelliJ IDEA (Ultimate or Community) build 251 (2025.1) or later, no upper bound. Compiled against IntelliJ IDEA 2026.2.
+
+## 10. License
+
+Apache License 2.0. See [LICENSE](LICENSE).
