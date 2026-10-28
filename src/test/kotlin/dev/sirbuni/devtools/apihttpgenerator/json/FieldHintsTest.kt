@@ -109,24 +109,7 @@ class FieldHintsTest {
     fun `every Faker method a hint uses was verified against the HTTP Client`() {
         val unverified = FieldHints.allHintGenerators().filterIsInstance<FakerValue>()
             .map { "${it.provider}.${it.method}" }
-            .filterNot { it in VERIFIED_IN_HTTP_CLIENT }
+            .filterNot { it in Rules.verifiedPlaceholders }
         assertEquals(emptyList<String>(), unverified)
-    }
-
-    companion object {
-        /** Resolved by ijhttp (IntelliJ HTTP Client 2026.2) on 2026-10-27; `job.*`, `date.*`, `bool.*` and others did not. */
-        val VERIFIED_IN_HTTP_CLIENT = setOf(
-            "name.firstName", "name.lastName", "name.fullName", "name.username", "name.title",
-            "internet.emailAddress", "internet.url", "internet.domainName", "internet.password", "internet.ipV4Address",
-            "internet.image", "internet.slug",
-            "phoneNumber.cellPhone",
-            "address.city", "address.streetAddress", "address.fullAddress", "address.zipCode", "address.country",
-            "address.countryCode", "address.state", "address.latitude", "address.longitude",
-            "company.name", "company.industry", "company.profession",
-            "commerce.department", "commerce.productName", "commerce.price",
-            "lorem.word", "lorem.sentence", "lorem.paragraph",
-            "color.name", "university.name", "educator.course",
-            "finance.iban", "finance.bic", "code.isbn13", "idNumber.valid",
-        )
     }
 }
